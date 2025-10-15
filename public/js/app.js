@@ -12,7 +12,9 @@ const state = {
     priority: [],
     search: ''
   },
-  view: 'tasks'
+  view: 'tasks',
+  expandedTasks: new Set(), // Track which tasks have subtasks expanded
+  scrollPositions: {} // Store scroll positions per view
 };
 
 // API calls
@@ -65,6 +67,40 @@ async function loadPRDContent(filename) {
   }
 }
 
+// Helper: Flatten tasks including subtasks
+function flattenTasks(tasks) {
+  const result = [];
+  function flatten(taskList) {
+    taskList.forEach(task => {
+      result.push(task);
+      if (task.subtasks && task.subtasks.length > 0) {
+        flatten(task.subtasks);
+      }
+    });
+  }
+  flatten(tasks);
+  return result;
+}
+
+// Helper: Check if task matches filters
+function taskMatchesFilters(task) {
+  if (state.filters.status.length > 0 && !state.filters.status.includes(task.status)) {
+    return false;
+  }
+  if (state.filters.priority.length > 0 && !state.filters.priority.includes(task.priority)) {
+    return false;
+  }
+  if (state.filters.search) {
+    const searchLower = state.filters.search.toLowerCase();
+    return (
+      task.title?.toLowerCase().includes(searchLower) ||
+      task.description?.toLowerCase().includes(searchLower) ||
+      task.id?.toString().includes(searchLower)
+    );
+  }
+  return true;
+}
+
 // Filtering
 function getDisplayTasks() {
   let displayTasks = [];
@@ -79,28 +115,34 @@ function getDisplayTasks() {
     }
   }
 
-  return displayTasks.filter(task => {
-    if (state.filters.status.length > 0 && !state.filters.status.includes(task.status)) {
+  // Filter tasks (hierarchical filtering - if parent matches, show all subtasks)
+  function filterTasksRecursive(tasks) {
+    return tasks.filter(task => {
+      const taskMatches = taskMatchesFilters(task);
+      const hasMatchingSubtasks = task.subtasks && task.subtasks.length > 0 &&
+        filterTasksRecursive(task.subtasks).length > 0;
+
+      if (taskMatches || hasMatchingSubtasks) {
+        if (task.subtasks && task.subtasks.length > 0) {
+          task.subtasks = filterTasksRecursive(task.subtasks);
+        }
+        return true;
+      }
       return false;
-    }
-    if (state.filters.priority.length > 0 && !state.filters.priority.includes(task.priority)) {
-      return false;
-    }
-    if (state.filters.search) {
-      const searchLower = state.filters.search.toLowerCase();
-      return (
-        task.title?.toLowerCase().includes(searchLower) ||
-        task.description?.toLowerCase().includes(searchLower) ||
-        task.id?.toString().includes(searchLower)
-      );
-    }
-    return true;
-  });
+    }).map(task => ({...task})); // Clone to avoid mutating original
+  }
+
+  return filterTasksRecursive(displayTasks);
 }
 
 // Render functions
 function render() {
   const app = document.getElementById('app');
+
+  // Save scroll position before render
+  const taskListContent = document.querySelector('.task-list-content');
+  const savedScrollTop = taskListContent ? taskListContent.scrollTop : 0;
+
   app.innerHTML = `
     ${renderHeader()}
     <div class="app-body">
@@ -112,6 +154,12 @@ function render() {
     </div>
   `;
   attachEventListeners();
+
+  // Restore scroll position after render
+  const newTaskListContent = document.querySelector('.task-list-content');
+  if (newTaskListContent && savedScrollTop > 0) {
+    newTaskListContent.scrollTop = savedScrollTop;
+  }
 }
 
 function renderHeader() {
@@ -224,29 +272,49 @@ function renderTaskView() {
     `;
   }
 
+  // Count all tasks including subtasks
+  const allTasks = flattenTasks(tasks);
+
   return `
     <div class="task-list">
       <div class="task-list-header">
         <h2>Tasks</h2>
-        <span class="task-count">${tasks.length} tasks</span>
+        <span class="task-count">${allTasks.length} tasks</span>
       </div>
       <div class="task-list-content">
-        ${tasks.map(task => `
-          <div class="task-item ${state.selectedTask?.id === task.id ? 'selected' : ''}" data-task-id="${task.id}">
-            <div class="task-content">
-              <div class="task-header">
-                <span class="task-id">${task.id}</span>
-                <span class="badge status-${task.status}">${task.status}</span>
-                ${task.priority ? `<span class="badge priority-${task.priority}">${task.priority}</span>` : ''}
-              </div>
-              <div class="task-title">${task.title}</div>
-              ${task.description ? `<div class="task-description">${task.description}</div>` : ''}
-            </div>
-          </div>
-        `).join('')}
+        ${tasks.map(task => renderTaskItem(task, 0)).join('')}
       </div>
     </div>
     ${state.selectedTask ? renderTaskDetail() : ''}
+  `;
+}
+
+// Recursive function to render a task and its subtasks
+function renderTaskItem(task, depth = 0) {
+  const hasSubtasks = task.subtasks && task.subtasks.length > 0;
+  const isExpanded = state.expandedTasks.has(task.id);
+  const indentStyle = depth > 0 ? `padding-left: ${depth * 1.5 + 1}rem;` : '';
+
+  return `
+    <div class="task-item ${state.selectedTask?.id === task.id ? 'selected' : ''}"
+         data-task-id="${task.id}"
+         style="${indentStyle}">
+      <div class="task-content">
+        <div class="task-header">
+          ${hasSubtasks ? `
+            <button class="expand-button" data-expand-task="${task.id}" title="${isExpanded ? 'Collapse' : 'Expand'}">
+              ${isExpanded ? '▼' : '▶'}
+            </button>
+          ` : '<span style="width: 16px; display: inline-block;"></span>'}
+          <span class="task-id">${task.id}</span>
+          <span class="badge status-${task.status}">${task.status}</span>
+          ${task.priority ? `<span class="badge priority-${task.priority}">${task.priority}</span>` : ''}
+        </div>
+        <div class="task-title">${task.title}</div>
+        ${task.description ? `<div class="task-description">${task.description}</div>` : ''}
+      </div>
+    </div>
+    ${hasSubtasks && isExpanded ? task.subtasks.map(subtask => renderTaskItem(subtask, depth + 1)).join('') : ''}
   `;
 }
 
@@ -297,6 +365,25 @@ function renderTaskDetail() {
             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
               ${task.dependencies.map(dep => `
                 <span style="background: #27272a; color: #3b82f6; padding: 0.375rem 0.75rem; border-radius: 4px; font-family: monospace;">${dep}</span>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+
+        ${task.subtasks && task.subtasks.length > 0 ? `
+          <div class="detail-section">
+            <h3>Subtasks (${task.subtasks.length})</h3>
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+              ${task.subtasks.map(subtask => `
+                <div style="background: #27272a; padding: 0.75rem; border-radius: 4px; border-left: 3px solid #3b82f6;">
+                  <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                    <span style="font-family: monospace; color: #3b82f6; font-weight: 600;">${subtask.id}</span>
+                    <span class="badge status-${subtask.status}">${subtask.status}</span>
+                    ${subtask.priority ? `<span class="badge priority-${subtask.priority}">${subtask.priority}</span>` : ''}
+                  </div>
+                  <div style="color: #e4e4e7; font-weight: 500;">${subtask.title}</div>
+                  ${subtask.description ? `<div style="color: #a1a1aa; font-size: 0.875rem; margin-top: 0.25rem;">${subtask.description}</div>` : ''}
+                </div>
               `).join('')}
             </div>
           </div>
@@ -453,12 +540,32 @@ function attachEventListeners() {
     });
   }
 
+  // Expand/collapse buttons
+  document.querySelectorAll('[data-expand-task]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation(); // Prevent task selection
+      const taskId = btn.dataset.expandTask;
+      if (state.expandedTasks.has(taskId)) {
+        state.expandedTasks.delete(taskId);
+      } else {
+        state.expandedTasks.add(taskId);
+      }
+      render();
+    });
+  });
+
   // Task selection
   document.querySelectorAll('[data-task-id]').forEach(item => {
-    item.addEventListener('click', () => {
+    item.addEventListener('click', (e) => {
+      // Don't select if clicking expand button
+      if (e.target.closest('[data-expand-task]')) {
+        return;
+      }
+
       const taskId = item.dataset.taskId;
       const tasks = getDisplayTasks();
-      state.selectedTask = tasks.find(t => t.id.toString() === taskId);
+      const allTasks = flattenTasks(tasks);
+      state.selectedTask = allTasks.find(t => t.id.toString() === taskId);
       render();
     });
   });
