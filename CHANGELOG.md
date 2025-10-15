@@ -5,6 +5,18 @@ All notable changes to tm-view will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2025-10-15
+
+### Fixed
+- Fixed flexbox scrolling throughout entire application
+- Proper viewport height constraints for scrollable regions
+- All content areas now scroll correctly (tasks, PRDs, details)
+
+### Added
+- Markdown rendering for PRD `.md` files with beautiful formatting
+- Complete flexbox scrolling documentation in SCROLLING_FIX.md
+- Enhanced metadata in package.json (repository, bugs, homepage)
+
 ## [1.0.0] - 2025-10-15
 
 ### Added

@@ -1,15 +1,37 @@
 # Development files
-.git
+.git/
 .gitignore
 .DS_Store
+.npmrc
 
-# Documentation
+# IDE and tool configs
+.cursor/
+.windsurf/
+.zed/
+.vscode/
+.taskmaster/
+
+# Development docs
 SCROLLING_FIX.md
-/tmp
+PUBLISHING.md
+PUBLISH_CHECKLIST.md
+CLAUDE.md
+AGENTS.md
+.rules
+
+# Config files
+.env.example
+.mcp.json
+opencode.json
+
+# Large development files
+task-master-repo.xml
+*.xml
 
 # Test files
 test/
 *.test.js
+/tmp
 
-# Build artifacts (none for vanilla JS!)
+# Build artifacts
 node_modules/
