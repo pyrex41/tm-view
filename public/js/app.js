@@ -634,5 +634,71 @@ function attachEventListeners() {
   });
 }
 
+// Show reload notification
+function showReloadNotification(message) {
+  // Remove existing notification
+  const existing = document.querySelector('.reload-notification');
+  if (existing) {
+    existing.remove();
+  }
+
+  // Create notification
+  const notification = document.createElement('div');
+  notification.className = 'reload-notification';
+  notification.textContent = message;
+  document.body.appendChild(notification);
+
+  // Fade in
+  setTimeout(() => {
+    notification.classList.add('show');
+  }, 10);
+
+  // Fade out and remove
+  setTimeout(() => {
+    notification.classList.remove('show');
+    setTimeout(() => notification.remove(), 300);
+  }, 2000);
+}
+
+// Hot-reloading via Server-Sent Events
+function setupHotReload() {
+  const eventSource = new EventSource('/api/events');
+
+  eventSource.onopen = () => {
+    console.log('🔌 Connected to hot-reload server');
+  };
+
+  eventSource.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+
+      if (data.type === 'connected') {
+        console.log('✓ Hot-reload active');
+      } else if (data.type === 'tasks-updated') {
+        console.log('🔄 Tasks updated, reloading...');
+        showReloadNotification('🔄 Tasks updated');
+        loadData();
+      } else if (data.type === 'prds-updated') {
+        console.log('🔄 PRDs updated, reloading...');
+        showReloadNotification('🔄 PRDs updated');
+        loadData();
+      }
+    } catch (error) {
+      console.error('Error parsing SSE message:', error);
+    }
+  };
+
+  eventSource.onerror = (error) => {
+    console.error('SSE connection error:', error);
+    // EventSource will automatically reconnect
+  };
+
+  // Close connection on page unload
+  window.addEventListener('beforeunload', () => {
+    eventSource.close();
+  });
+}
+
 // Initialize
 loadData();
+setupHotReload();

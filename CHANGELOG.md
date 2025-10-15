@@ -5,6 +5,21 @@ All notable changes to tm-view will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] - 2025-10-15
+
+### Added
+- Hot-reloading via Server-Sent Events (SSE)
+- Automatic updates when tasks.json changes
+- Automatic updates when PRD documents are added or modified
+- Visual notification toast when data updates
+- Real-time synchronization with Task Master changes
+
+### Technical
+- SSE endpoint at `/api/events` for real-time updates
+- File watching for `.taskmaster/tasks/` and `.taskmaster/docs/`
+- Debounced file change detection (300ms)
+- Automatic reconnection on connection loss
+
 ## [1.0.2] - 2025-10-15
 
 ### Fixed

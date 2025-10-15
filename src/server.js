@@ -201,6 +201,74 @@ app.get('/api/stats', (req, res) => {
   }
 });
 
+// SSE endpoint for hot-reloading
+const clients = new Set();
+
+app.get('/api/events', (req, res) => {
+  // Set SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
+  // Send initial connection message
+  res.write('data: {"type":"connected"}\n\n');
+
+  // Add client to set
+  clients.add(res);
+
+  // Remove client on disconnect
+  req.on('close', () => {
+    clients.delete(res);
+  });
+});
+
+// Broadcast to all connected clients
+function broadcast(data) {
+  const message = `data: ${JSON.stringify(data)}\n\n`;
+  clients.forEach(client => {
+    try {
+      client.write(message);
+    } catch (error) {
+      clients.delete(client);
+    }
+  });
+}
+
+// Watch for file changes
+const tasksDir = path.join(TASKMASTER_DIR, 'tasks');
+const docsDir = path.join(TASKMASTER_DIR, 'docs');
+
+// Debounce function to avoid multiple rapid updates
+let debounceTimer = null;
+function debounce(callback, delay = 300) {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(callback, delay);
+}
+
+// Watch tasks directory
+if (fs.existsSync(tasksDir)) {
+  fs.watch(tasksDir, { recursive: false }, (eventType, filename) => {
+    if (filename === 'tasks.json') {
+      debounce(() => {
+        console.log(chalk.cyan('📝 Tasks updated, notifying clients...'));
+        broadcast({ type: 'tasks-updated' });
+      });
+    }
+  });
+}
+
+// Watch docs directory
+if (fs.existsSync(docsDir)) {
+  fs.watch(docsDir, { recursive: false }, (eventType, filename) => {
+    if (filename && (filename.endsWith('.txt') || filename.endsWith('.md'))) {
+      debounce(() => {
+        console.log(chalk.cyan('📄 PRDs updated, notifying clients...'));
+        broadcast({ type: 'prds-updated' });
+      });
+    }
+  });
+}
+
 // Fallback to serve index.html for client-side routing
 app.get('*', (req, res) => {
   const indexPath = path.join(publicDir, 'index.html');
