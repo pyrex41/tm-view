@@ -1,6 +1,12 @@
 # tm-view
 
+[![GitHub](https://img.shields.io/badge/github-pyrex41%2Ftm--view-blue)](https://github.com/pyrex41/tm-view)
+[![npm version](https://img.shields.io/npm/v/tm-view.svg)](https://www.npmjs.com/package/tm-view)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Browser-based viewer for Task Master AI projects. View tasks, PRDs, and project statistics in a clean, intuitive interface.
+
+**Repository**: [github.com/pyrex41/tm-view](https://github.com/pyrex41/tm-view)
 
 ## Features
 
@@ -96,14 +102,11 @@ To work on tm-view locally:
 
 ```bash
 # Clone and install dependencies
-git clone <repo>
+git clone git@github.com:pyrex41/tm-view.git
 cd tm-view
 npm install
 
-# Build frontend
-npm run build:frontend
-
-# Test locally
+# Test locally (no build step needed!)
 npm link
 cd /path/to/taskmaster/project
 tm-view

@@ -10,15 +10,25 @@
   "scripts": {
     "start": "node src/server.js"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pyrex41/tm-view.git"
+  },
+  "bugs": {
+    "url": "https://github.com/pyrex41/tm-view/issues"
+  },
+  "homepage": "https://github.com/pyrex41/tm-view#readme",
   "keywords": [
     "task-master",
     "taskmaster",
     "viewer",
     "project-management",
     "ai",
-    "task-viewer"
+    "task-viewer",
+    "prd-viewer",
+    "vanilla-js"
   ],
-  "author": "",
+  "author": "pyrex41",
   "license": "MIT",
   "dependencies": {
     "express": "^4.18.2",

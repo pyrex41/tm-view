@@ -1,0 +1,15 @@
+# Development files
+.git
+.gitignore
+.DS_Store
+
+# Documentation
+SCROLLING_FIX.md
+/tmp
+
+# Test files
+test/
+*.test.js
+
+# Build artifacts (none for vanilla JS!)
+node_modules/
