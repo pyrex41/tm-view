@@ -563,8 +563,20 @@ function attachEventListeners() {
       }
 
       const taskId = item.dataset.taskId;
-      const tasks = getDisplayTasks();
-      const allTasks = flattenTasks(tasks);
+
+      // Get ORIGINAL tasks (not filtered) to find the correct task
+      let originalTasks = [];
+      if (state.tasks.format === 'legacy') {
+        originalTasks = state.tasks.tasks || [];
+      } else if (state.tasks.format === 'tagged') {
+        if (state.tasks.currentTasks) {
+          originalTasks = state.tasks.currentTasks;
+        } else if (state.tasks.tasks[state.currentTag]) {
+          originalTasks = state.tasks.tasks[state.currentTag].tasks || [];
+        }
+      }
+
+      const allTasks = flattenTasks(originalTasks);
       state.selectedTask = allTasks.find(t => t.id.toString() === taskId);
       render();
     });
