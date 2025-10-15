@@ -1,0 +1,32 @@
+{
+  "name": "tm-view",
+  "version": "1.0.0",
+  "description": "Browser-based viewer for Task Master AI projects",
+  "main": "src/server.js",
+  "type": "module",
+  "bin": {
+    "tm-view": "./bin/tm-view.js"
+  },
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "keywords": [
+    "task-master",
+    "taskmaster",
+    "viewer",
+    "project-management",
+    "ai",
+    "task-viewer"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "open": "^10.0.3",
+    "chalk": "^5.3.0",
+    "cors": "^2.8.5"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
