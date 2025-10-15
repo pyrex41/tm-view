@@ -5,6 +5,28 @@ All notable changes to tm-view will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.6] - 2025-10-15
+
+### Added
+- Context bar at top of UI showing project information at a glance
+- Project directory path display (full path on hover)
+- Git information display (branch name, commit hash, clean/dirty status)
+- Task Master tag display for tagged projects
+- Port-based color coding for easy visual identification when running multiple instances
+- Vibrant color accent on left border and port number badge
+- Port number display in context bar
+
+### Fixed
+- Hot-reload now preserves scroll positions in all panels (task list, detail, PRDs)
+- Hot-reload now preserves currently selected task or PRD
+- Hot-reload now preserves expanded subtasks in detail panel
+- Eliminated view reset on data updates
+
+### Technical
+- Added `reloadData()` function for hot-reload without rendering
+- Enhanced state preservation during SSE updates
+- Port color generation using golden angle algorithm for consistent, distinct colors
+
 ## [1.0.5] - 2025-10-15
 
 ### Fixed

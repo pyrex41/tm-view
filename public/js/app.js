@@ -53,6 +53,29 @@ async function loadData() {
   }
 }
 
+// Reload data without rendering (for hot-reload)
+async function reloadData() {
+  try {
+    const [projectRes, tasksRes, prdsRes, statsRes] = await Promise.all([
+      fetch('/api/project'),
+      fetch('/api/tasks'),
+      fetch('/api/prds'),
+      fetch('/api/stats')
+    ]);
+
+    state.project = await projectRes.json();
+    state.tasks = await tasksRes.json();
+    state.prds = (await prdsRes.json()).prds || [];
+    state.stats = await statsRes.json();
+    state.currentTag = state.project.currentTag || 'master';
+
+    // Cache original tasks for lookups
+    updateOriginalTasksCache();
+  } catch (error) {
+    console.error('Error reloading data:', error);
+  }
+}
+
 // Update the original tasks cache
 function updateOriginalTasksCache() {
   if (state.tasks.format === 'legacy') {
@@ -183,8 +206,10 @@ function render() {
   // Save scroll positions before render
   const taskListContent = document.querySelector('.task-list-content');
   const taskDetailContent = document.querySelector('.task-detail-content');
+  const prdContentBody = document.querySelector('.prd-content-body');
   const savedTaskListScroll = taskListContent ? taskListContent.scrollTop : 0;
   const savedDetailScroll = taskDetailContent ? taskDetailContent.scrollTop : 0;
+  const savedPRDScroll = prdContentBody ? prdContentBody.scrollTop : 0;
 
   app.innerHTML = `
     ${renderHeader()}
@@ -208,18 +233,65 @@ function render() {
   if (newTaskDetailContent && savedDetailScroll > 0) {
     newTaskDetailContent.scrollTop = savedDetailScroll;
   }
+
+  const newPRDContentBody = document.querySelector('.prd-content-body');
+  if (newPRDContentBody && savedPRDScroll > 0) {
+    newPRDContentBody.scrollTop = savedPRDScroll;
+  }
+}
+
+// Generate a consistent color from port number
+function getPortColor(port) {
+  // Generate a hue based on port number (0-360 degrees)
+  const hue = (port * 137.508) % 360; // Use golden angle for good distribution
+  // Use higher saturation and lightness for more vibrant colors
+  return `hsl(${hue}, 65%, 60%)`;
 }
 
 function renderHeader() {
+  const portColor = state.project?.port ? getPortColor(state.project.port) : '#71717a';
+  const portColorBg = state.project?.port ? `hsl(${(state.project.port * 137.508) % 360}, 65%, 60%, 0.15)` : 'rgba(113, 113, 122, 0.15)';
+
   return `
     <header class="app-header">
+      ${state.project ? `
+        <div class="context-bar" style="border-left: 6px solid ${portColor}; box-shadow: inset 6px 0 12px -6px ${portColor};">
+          <div class="context-item">
+            <span class="context-label">📁</span>
+            <span class="context-value" title="${state.project.projectPath}">${state.project.projectPath}</span>
+          </div>
+          ${state.project.git ? `
+            <div class="context-item">
+              <span class="context-label">🌿</span>
+              <span class="context-value">${state.project.git.branch}</span>
+            </div>
+            <div class="context-item">
+              <span class="context-label">${state.project.git.isDirty ? '●' : '✓'}</span>
+              <span class="context-value ${state.project.git.isDirty ? 'git-dirty' : 'git-clean'}">${state.project.git.isDirty ? 'modified' : 'clean'}</span>
+            </div>
+            <div class="context-item">
+              <span class="context-label">#</span>
+              <span class="context-value">${state.project.git.shortHash}</span>
+            </div>
+          ` : ''}
+          ${state.tasks.format === 'tagged' ? `
+            <div class="context-item">
+              <span class="context-label">🏷️</span>
+              <span class="context-value">${state.currentTag}</span>
+            </div>
+          ` : ''}
+          ${state.project.port ? `
+            <div class="context-item" style="margin-left: auto;">
+              <span class="context-label">:</span>
+              <span class="context-value" style="color: ${portColor}; background: ${portColorBg}; padding: 0.25rem 0.625rem; border-radius: 4px; font-weight: 600; border: 1px solid ${portColor}40;">${state.project.port}</span>
+            </div>
+          ` : ''}
+        </div>
+      ` : ''}
       <div class="header-content">
         <h1>📋 Task Master Viewer</h1>
         ${state.project ? `
-          <div class="project-info">
-            <span>${state.project.projectName}</span>
-            ${state.tasks.format === 'tagged' ? `<span class="current-tag">Tag: ${state.currentTag}</span>` : ''}
-          </div>
+          <div class="project-name">${state.project.projectName}</div>
         ` : ''}
       </div>
       <div class="view-tabs">
@@ -819,11 +891,14 @@ function setupHotReload() {
         console.log('🔄 Tasks updated, reloading...');
         showReloadNotification('🔄 Tasks updated');
 
-        // Save currently selected task ID
+        // Save current state before reload
         const selectedTaskId = state.selectedTask?.id;
+        const expandedSubtasks = new Set(state.expandedSubtasksInDetail);
+        const taskListScroll = document.querySelector('.task-list-content')?.scrollTop || 0;
+        const detailScroll = document.querySelector('.task-detail-content')?.scrollTop || 0;
 
-        // Reload data
-        await loadData();
+        // Reload data without rendering
+        await reloadData();
 
         // Restore selected task with fresh data
         if (selectedTaskId && originalTasksCache) {
@@ -834,26 +909,66 @@ function setupHotReload() {
             const allTasks = flattenTasks(originalTasksCache);
             state.selectedTask = allTasks.find(t => t.id.toString() === selectedTaskId.toString());
           }
-          render();
         }
+
+        // Restore expanded subtasks
+        state.expandedSubtasksInDetail = expandedSubtasks;
+
+        // Render with restored state
+        render();
+
+        // Restore scroll positions after a brief delay to ensure DOM is ready
+        setTimeout(() => {
+          const taskListContent = document.querySelector('.task-list-content');
+          if (taskListContent && taskListScroll > 0) {
+            taskListContent.scrollTop = taskListScroll;
+          }
+
+          const taskDetailContent = document.querySelector('.task-detail-content');
+          if (taskDetailContent && detailScroll > 0) {
+            taskDetailContent.scrollTop = detailScroll;
+          }
+        }, 10);
       } else if (data.type === 'prds-updated') {
         console.log('🔄 PRDs updated, reloading...');
         showReloadNotification('🔄 PRDs updated');
 
-        // Save currently selected PRD
+        // Save current state before reload
         const selectedPRDPath = state.selectedPRD;
+        const prdScroll = document.querySelector('.prd-content-body')?.scrollTop || 0;
 
-        // Reload data
-        await loadData();
+        // Reload data without rendering
+        await reloadData();
 
-        // Restore selected PRD and reload its content
+        // Restore selected PRD
         if (selectedPRDPath) {
           state.selectedPRD = selectedPRDPath;
-          render();
+        }
 
-          // Reload PRD content
+        // Render with restored state
+        render();
+
+        // Reload PRD content if one was selected
+        if (selectedPRDPath) {
           const placeholder = document.getElementById('prd-content-placeholder');
           if (placeholder) {
+            // Show loading state
+            placeholder.innerHTML = `
+              <div class="prd-content">
+                <div class="prd-list-header" style="border-bottom: 1px solid #27272a;">
+                  <h2>${selectedPRDPath}</h2>
+                  <button class="close-button" onclick="state.selectedPRD = null; render();">✕</button>
+                </div>
+                <div class="prd-content-body">
+                  <div class="loader-container">
+                    <div class="loader"></div>
+                    <p>Loading document...</p>
+                  </div>
+                </div>
+              </div>
+            `;
+
+            // Load and display content
             const prdData = await loadPRDContent(selectedPRDPath);
             if (prdData) {
               const isMarkdown = selectedPRDPath.toLowerCase().endsWith('.md');
@@ -876,6 +991,14 @@ function setupHotReload() {
                   </div>
                 </div>
               `;
+
+              // Restore scroll position after content loads
+              setTimeout(() => {
+                const prdContentBody = document.querySelector('.prd-content-body');
+                if (prdContentBody && prdScroll > 0) {
+                  prdContentBody.scrollTop = prdScroll;
+                }
+              }, 10);
             }
           }
         }

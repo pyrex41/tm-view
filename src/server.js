@@ -3,6 +3,7 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { execSync } from 'child_process';
 import open from 'open';
 import chalk from 'chalk';
 
@@ -24,6 +25,36 @@ app.use(express.static(publicDir));
 
 // API Routes
 
+// Helper: Get git information
+function getGitInfo() {
+  try {
+    const branch = execSync('git rev-parse --abbrev-ref HEAD', {
+      cwd: PROJECT_DIR,
+      encoding: 'utf8'
+    }).trim();
+
+    const shortHash = execSync('git rev-parse --short HEAD', {
+      cwd: PROJECT_DIR,
+      encoding: 'utf8'
+    }).trim();
+
+    const isDirty = execSync('git status --porcelain', {
+      cwd: PROJECT_DIR,
+      encoding: 'utf8'
+    }).trim().length > 0;
+
+    return {
+      branch,
+      shortHash,
+      isDirty,
+      status: isDirty ? 'dirty' : 'clean'
+    };
+  } catch (error) {
+    // Not a git repository or git not available
+    return null;
+  }
+}
+
 // Get project info
 app.get('/api/project', (req, res) => {
   try {
@@ -42,10 +73,14 @@ app.get('/api/project', (req, res) => {
       state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
     }
 
+    const gitInfo = getGitInfo();
+
     res.json({
       projectName,
       projectPath: PROJECT_DIR,
       currentTag: state.currentTag || 'master',
+      port: app.get('port'), // Include the port the server is running on
+      git: gitInfo,
       config,
       state
     });
@@ -298,6 +333,7 @@ async function findAvailablePort(startPort, maxAttempts = 10) {
 
 // Start server with smart port handling
 findAvailablePort(BASE_PORT).then(port => {
+  app.set('port', port); // Store port in app for API access
   app.listen(port, () => {
     console.log(chalk.green(`\n✓ Task Master Viewer running!`));
     console.log(chalk.cyan(`\n  ➜ Local:   http://localhost:${port}`));
