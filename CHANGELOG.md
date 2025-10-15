@@ -5,6 +5,23 @@ All notable changes to tm-view will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.5] - 2025-10-15
+
+### Fixed
+- Fixed task filtering mutating original task data
+- Task details now show correct information after filtering
+- Properly deep clones tasks during filtering to preserve original data
+- Fixed task titles, descriptions, and subtasks showing incorrectly in detail panel
+- Fixed subtask expansion in detail panel (type mismatch issue)
+- Fixed scroll position preservation for detail panel when expanding subtasks
+- Fixed hot-reload to preserve currently viewed task/PRD instead of resetting view
+
+### Improved
+- Enhanced typography with developer-friendly monospace fonts (SF Mono, Cascadia Code, JetBrains Mono, Fira Code)
+- Improved readability with better line-heights and font sizes
+- Better font-smoothing for crisper text rendering
+- Refined letter-spacing on titles and headings for better readability
+
 ## [1.0.4] - 2025-10-15
 
 ### Fixed

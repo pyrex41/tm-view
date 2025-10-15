@@ -13,9 +13,13 @@ const state = {
     search: ''
   },
   view: 'tasks',
-  expandedTasks: new Set(), // Track which tasks have subtasks expanded
+  expandedTasks: new Set(), // Track which tasks have subtasks expanded in task list
+  expandedSubtasksInDetail: new Set(), // Track which subtasks are expanded in detail panel
   scrollPositions: {} // Store scroll positions per view
 };
+
+// Store original unfiltered tasks (never mutate this)
+let originalTasksCache = null;
 
 // API calls
 async function loadData() {
@@ -33,6 +37,9 @@ async function loadData() {
     state.stats = await statsRes.json();
     state.currentTag = state.project.currentTag || 'master';
 
+    // Cache original tasks for lookups
+    updateOriginalTasksCache();
+
     render();
   } catch (error) {
     console.error('Error loading data:', error);
@@ -46,11 +53,25 @@ async function loadData() {
   }
 }
 
+// Update the original tasks cache
+function updateOriginalTasksCache() {
+  if (state.tasks.format === 'legacy') {
+    originalTasksCache = state.tasks.tasks || [];
+  } else if (state.tasks.format === 'tagged') {
+    if (state.tasks.currentTasks) {
+      originalTasksCache = state.tasks.currentTasks;
+    } else if (state.tasks.tasks[state.currentTag]) {
+      originalTasksCache = state.tasks.tasks[state.currentTag].tasks || [];
+    }
+  }
+}
+
 async function loadTasksForTag(tag) {
   try {
     const res = await fetch(`/api/tasks/${tag}`);
     const data = await res.json();
     state.tasks.currentTasks = data.tasks;
+    updateOriginalTasksCache();
     render();
   } catch (error) {
     console.error('Error loading tasks for tag:', error);
@@ -101,6 +122,15 @@ function taskMatchesFilters(task) {
   return true;
 }
 
+// Deep clone a task recursively
+function deepCloneTask(task) {
+  const cloned = { ...task };
+  if (task.subtasks && task.subtasks.length > 0) {
+    cloned.subtasks = task.subtasks.map(subtask => deepCloneTask(subtask));
+  }
+  return cloned;
+}
+
 // Filtering
 function getDisplayTasks() {
   let displayTasks = [];
@@ -115,21 +145,32 @@ function getDisplayTasks() {
     }
   }
 
+  // Deep clone all tasks first to avoid mutating originals
+  displayTasks = displayTasks.map(task => deepCloneTask(task));
+
   // Filter tasks (hierarchical filtering - if parent matches, show all subtasks)
   function filterTasksRecursive(tasks) {
-    return tasks.filter(task => {
+    const filtered = [];
+
+    for (const task of tasks) {
       const taskMatches = taskMatchesFilters(task);
-      const hasMatchingSubtasks = task.subtasks && task.subtasks.length > 0 &&
-        filterTasksRecursive(task.subtasks).length > 0;
+      let hasMatchingSubtasks = false;
+
+      // Check if any subtasks match (and filter them)
+      if (task.subtasks && task.subtasks.length > 0) {
+        const filteredSubtasks = filterTasksRecursive(task.subtasks);
+        if (filteredSubtasks.length > 0) {
+          hasMatchingSubtasks = true;
+          task.subtasks = filteredSubtasks;
+        }
+      }
 
       if (taskMatches || hasMatchingSubtasks) {
-        if (task.subtasks && task.subtasks.length > 0) {
-          task.subtasks = filterTasksRecursive(task.subtasks);
-        }
-        return true;
+        filtered.push(task);
       }
-      return false;
-    }).map(task => ({...task})); // Clone to avoid mutating original
+    }
+
+    return filtered;
   }
 
   return filterTasksRecursive(displayTasks);
@@ -139,9 +180,11 @@ function getDisplayTasks() {
 function render() {
   const app = document.getElementById('app');
 
-  // Save scroll position before render
+  // Save scroll positions before render
   const taskListContent = document.querySelector('.task-list-content');
-  const savedScrollTop = taskListContent ? taskListContent.scrollTop : 0;
+  const taskDetailContent = document.querySelector('.task-detail-content');
+  const savedTaskListScroll = taskListContent ? taskListContent.scrollTop : 0;
+  const savedDetailScroll = taskDetailContent ? taskDetailContent.scrollTop : 0;
 
   app.innerHTML = `
     ${renderHeader()}
@@ -155,10 +198,15 @@ function render() {
   `;
   attachEventListeners();
 
-  // Restore scroll position after render
+  // Restore scroll positions after render
   const newTaskListContent = document.querySelector('.task-list-content');
-  if (newTaskListContent && savedScrollTop > 0) {
-    newTaskListContent.scrollTop = savedScrollTop;
+  if (newTaskListContent && savedTaskListScroll > 0) {
+    newTaskListContent.scrollTop = savedTaskListScroll;
+  }
+
+  const newTaskDetailContent = document.querySelector('.task-detail-content');
+  if (newTaskDetailContent && savedDetailScroll > 0) {
+    newTaskDetailContent.scrollTop = savedDetailScroll;
   }
 }
 
@@ -364,7 +412,7 @@ function renderTaskDetail() {
             <h3>Dependencies</h3>
             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
               ${task.dependencies.map(dep => `
-                <span style="background: #27272a; color: #3b82f6; padding: 0.375rem 0.75rem; border-radius: 4px; font-family: monospace;">${dep}</span>
+                <span style="background: #27272a; color: #3b82f6; padding: 0.375rem 0.75rem; border-radius: 4px; font-family: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', 'Consolas', monospace; font-weight: 500;">${dep}</span>
               `).join('')}
             </div>
           </div>
@@ -374,17 +422,74 @@ function renderTaskDetail() {
           <div class="detail-section">
             <h3>Subtasks (${task.subtasks.length})</h3>
             <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-              ${task.subtasks.map(subtask => `
-                <div style="background: #27272a; padding: 0.75rem; border-radius: 4px; border-left: 3px solid #3b82f6;">
-                  <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
-                    <span style="font-family: monospace; color: #3b82f6; font-weight: 600;">${subtask.id}</span>
-                    <span class="badge status-${subtask.status}">${subtask.status}</span>
-                    ${subtask.priority ? `<span class="badge priority-${subtask.priority}">${subtask.priority}</span>` : ''}
+              ${task.subtasks.map(subtask => {
+                const isExpanded = state.expandedSubtasksInDetail.has(subtask.id.toString());
+                return `
+                  <div class="subtask-card ${isExpanded ? 'expanded' : ''}" data-subtask-id="${subtask.id}" style="background: #27272a; padding: 0.75rem; border-radius: 4px; border-left: 3px solid ${isExpanded ? '#60a5fa' : '#3b82f6'}; cursor: pointer; transition: all 0.2s;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                      <span style="font-family: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', 'Consolas', monospace; color: #3b82f6; font-weight: 600;">${subtask.id}</span>
+                      <span class="badge status-${subtask.status}">${subtask.status}</span>
+                      ${subtask.priority ? `<span class="badge priority-${subtask.priority}">${subtask.priority}</span>` : ''}
+                      <span style="margin-left: auto; color: #71717a; font-size: 0.75rem;">${isExpanded ? '▼' : '▶'}</span>
+                    </div>
+                    <div style="color: #e4e4e7; font-weight: 500;">${subtask.title}</div>
+                    ${!isExpanded && subtask.description ? `<div style="color: #a1a1aa; font-size: 0.875rem; margin-top: 0.25rem;">${subtask.description}</div>` : ''}
+
+                    ${isExpanded ? `
+                      <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #3f3f46;">
+                        ${subtask.description ? `
+                          <div style="margin-bottom: 1rem;">
+                            <div style="color: #a1a1aa; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; margin-bottom: 0.5rem;">Description</div>
+                            <div style="color: #e4e4e7;">${subtask.description}</div>
+                          </div>
+                        ` : ''}
+
+                        ${subtask.details ? `
+                          <div style="margin-bottom: 1rem;">
+                            <div style="color: #a1a1aa; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; margin-bottom: 0.5rem;">Details</div>
+                            <div style="color: #e4e4e7; white-space: pre-wrap;">${subtask.details}</div>
+                          </div>
+                        ` : ''}
+
+                        ${subtask.testStrategy ? `
+                          <div style="margin-bottom: 1rem;">
+                            <div style="color: #a1a1aa; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; margin-bottom: 0.5rem;">Test Strategy</div>
+                            <div style="color: #e4e4e7; white-space: pre-wrap;">${subtask.testStrategy}</div>
+                          </div>
+                        ` : ''}
+
+                        ${subtask.dependencies && subtask.dependencies.length > 0 ? `
+                          <div style="margin-bottom: 1rem;">
+                            <div style="color: #a1a1aa; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; margin-bottom: 0.5rem;">Dependencies</div>
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                              ${subtask.dependencies.map(dep => `
+                                <span style="background: #18181b; color: #3b82f6; padding: 0.25rem 0.5rem; border-radius: 3px; font-family: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', 'Consolas', monospace; font-size: 0.75rem; font-weight: 500;">${dep}</span>
+                              `).join('')}
+                            </div>
+                          </div>
+                        ` : ''}
+
+                        ${subtask.subtasks && subtask.subtasks.length > 0 ? `
+                          <div>
+                            <div style="color: #a1a1aa; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; margin-bottom: 0.5rem;">Subtasks (${subtask.subtasks.length})</div>
+                            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                              ${subtask.subtasks.map(subsubtask => `
+                                <div style="background: #18181b; padding: 0.5rem; border-radius: 3px; border-left: 2px solid #3b82f6;">
+                                  <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <span style="font-family: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', 'Consolas', monospace; color: #3b82f6; font-size: 0.75rem; font-weight: 600;">${subsubtask.id}</span>
+                                    <span class="badge status-${subsubtask.status}" style="font-size: 0.65rem; padding: 0.125rem 0.375rem;">${subsubtask.status}</span>
+                                  </div>
+                                  <div style="color: #e4e4e7; font-size: 0.875rem; margin-top: 0.25rem;">${subsubtask.title}</div>
+                                </div>
+                              `).join('')}
+                            </div>
+                          </div>
+                        ` : ''}
+                      </div>
+                    ` : ''}
                   </div>
-                  <div style="color: #e4e4e7; font-weight: 500;">${subtask.title}</div>
-                  ${subtask.description ? `<div style="color: #a1a1aa; font-size: 0.875rem; margin-top: 0.25rem;">${subtask.description}</div>` : ''}
-                </div>
-              `).join('')}
+                `;
+              }).join('')}
             </div>
           </div>
         ` : ''}
@@ -466,7 +571,7 @@ function renderStats() {
           <h3>By Tag</h3>
           ${Object.entries(state.stats.byTag || {}).map(([tag, count]) => `
             <div class="stat-item">
-              <span style="font-family: monospace;">${tag}</span>
+              <span style="font-family: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', 'Consolas', monospace; font-weight: 500;">${tag}</span>
               <span class="stat-count">${count}</span>
             </div>
           `).join('')}
@@ -564,20 +669,43 @@ function attachEventListeners() {
 
       const taskId = item.dataset.taskId;
 
-      // Get ORIGINAL tasks (not filtered) to find the correct task
-      let originalTasks = [];
-      if (state.tasks.format === 'legacy') {
-        originalTasks = state.tasks.tasks || [];
-      } else if (state.tasks.format === 'tagged') {
-        if (state.tasks.currentTasks) {
-          originalTasks = state.tasks.currentTasks;
-        } else if (state.tasks.tasks[state.currentTag]) {
-          originalTasks = state.tasks.tasks[state.currentTag].tasks || [];
+      // Find task by ID in the original cache
+      if (originalTasksCache) {
+        // First check if this is a top-level task (no dot in ID)
+        const isTopLevel = !taskId.includes('.');
+
+        if (isTopLevel) {
+          // For top-level tasks, search only in top-level tasks (not subtasks)
+          state.selectedTask = originalTasksCache.find(t => t.id.toString() === taskId);
+        } else {
+          // For subtasks, search in flattened list
+          const allTasks = flattenTasks(originalTasksCache);
+          state.selectedTask = allTasks.find(t => t.id.toString() === taskId);
         }
+
+        // Clear expanded subtasks when selecting a new task
+        state.expandedSubtasksInDetail.clear();
+
+        render();
+      }
+    });
+  });
+
+  // Subtask expansion (click subtasks in detail panel to expand them inline)
+  const subtaskCards = document.querySelectorAll('[data-subtask-id]');
+
+  subtaskCards.forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.stopPropagation(); // Prevent event bubbling
+      const subtaskId = item.dataset.subtaskId;
+
+      // Toggle expansion
+      if (state.expandedSubtasksInDetail.has(subtaskId)) {
+        state.expandedSubtasksInDetail.delete(subtaskId);
+      } else {
+        state.expandedSubtasksInDetail.add(subtaskId);
       }
 
-      const allTasks = flattenTasks(originalTasks);
-      state.selectedTask = allTasks.find(t => t.id.toString() === taskId);
       render();
     });
   });
@@ -587,6 +715,7 @@ function attachEventListeners() {
   if (closeBtn) {
     closeBtn.addEventListener('click', () => {
       state.selectedTask = null;
+      state.expandedSubtasksInDetail.clear(); // Clear expanded subtasks when closing
       render();
     });
   }
@@ -680,7 +809,7 @@ function setupHotReload() {
     console.log('🔌 Connected to hot-reload server');
   };
 
-  eventSource.onmessage = (event) => {
+  eventSource.onmessage = async (event) => {
     try {
       const data = JSON.parse(event.data);
 
@@ -689,11 +818,67 @@ function setupHotReload() {
       } else if (data.type === 'tasks-updated') {
         console.log('🔄 Tasks updated, reloading...');
         showReloadNotification('🔄 Tasks updated');
-        loadData();
+
+        // Save currently selected task ID
+        const selectedTaskId = state.selectedTask?.id;
+
+        // Reload data
+        await loadData();
+
+        // Restore selected task with fresh data
+        if (selectedTaskId && originalTasksCache) {
+          const isTopLevel = !selectedTaskId.toString().includes('.');
+          if (isTopLevel) {
+            state.selectedTask = originalTasksCache.find(t => t.id.toString() === selectedTaskId.toString());
+          } else {
+            const allTasks = flattenTasks(originalTasksCache);
+            state.selectedTask = allTasks.find(t => t.id.toString() === selectedTaskId.toString());
+          }
+          render();
+        }
       } else if (data.type === 'prds-updated') {
         console.log('🔄 PRDs updated, reloading...');
         showReloadNotification('🔄 PRDs updated');
-        loadData();
+
+        // Save currently selected PRD
+        const selectedPRDPath = state.selectedPRD;
+
+        // Reload data
+        await loadData();
+
+        // Restore selected PRD and reload its content
+        if (selectedPRDPath) {
+          state.selectedPRD = selectedPRDPath;
+          render();
+
+          // Reload PRD content
+          const placeholder = document.getElementById('prd-content-placeholder');
+          if (placeholder) {
+            const prdData = await loadPRDContent(selectedPRDPath);
+            if (prdData) {
+              const isMarkdown = selectedPRDPath.toLowerCase().endsWith('.md');
+              let contentHtml;
+
+              if (isMarkdown && typeof marked !== 'undefined') {
+                contentHtml = `<div class="prd-markdown">${marked.parse(prdData.content)}</div>`;
+              } else {
+                contentHtml = `<pre class="prd-text">${prdData.content}</pre>`;
+              }
+
+              placeholder.innerHTML = `
+                <div class="prd-content">
+                  <div class="prd-list-header" style="border-bottom: 1px solid #27272a;">
+                    <h2>${selectedPRDPath}</h2>
+                    <button class="close-button" onclick="state.selectedPRD = null; render();">✕</button>
+                  </div>
+                  <div class="prd-content-body">
+                    ${contentHtml}
+                  </div>
+                </div>
+              `;
+            }
+          }
+        }
       }
     } catch (error) {
       console.error('Error parsing SSE message:', error);
