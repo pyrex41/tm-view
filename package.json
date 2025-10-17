@@ -8,7 +8,11 @@
     "tm-view": "./bin/tm-view.js"
   },
   "scripts": {
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "elm:dev": "elm make src/Main.elm --output=public/js/app.js",
+    "elm:prod": "elm make src/Main.elm --optimize --output=public/js/app.js && terser public/js/app.js --compress 'pure_funcs=[F2,F3,F4,F5,F6,F7,F8,F9,A2,A3,A4,A5,A6,A7,A8,A9],pure_getters,keep_fargs=false,unsafe_comps,unsafe' --mangle --output=public/js/app.js",
+    "build": "npm run elm:prod",
+    "package:binary": "pkg . --out-path dist --targets node18-win-x64,node18-macos-x64,node18-linux-x64"
   },
   "repository": {
     "type": "git",
@@ -35,6 +39,18 @@
     "open": "^10.0.3",
     "chalk": "^5.3.0",
     "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "terser": "^5.24.0",
+    "pkg": "^5.8.1"
+  },
+  "pkg": {
+    "scripts": "src/server.js",
+    "assets": [
+      "public/**/*",
+      ".taskmaster/**/*"
+    ],
+    "outputPath": "dist"
   },
   "engines": {
     "node": ">=16.0.0"

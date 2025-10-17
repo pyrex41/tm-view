@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Task Master Viewer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/styles.css">
   <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
 </head>
@@ -15,6 +18,42 @@
     </div>
   </div>
 
-  <script src="/js/app.js" type="module"></script>
+  <script src="/js/app.js"></script>
+  <script>
+    // Initialize the Elm app
+    var app = Elm.Main.init({
+      node: document.getElementById('app')
+    });
+
+    // PORT: Set up Server-Sent Events (only if the port exists)
+    if (app.ports && app.ports.setupSSE) {
+      app.ports.setupSSE.subscribe(function() {
+        var eventSource = new EventSource('/api/events');
+        
+        eventSource.onmessage = function(event) {
+          if (app.ports.sseMessageReceived) {
+            app.ports.sseMessageReceived.send(event.data);
+          }
+        };
+        
+        eventSource.onerror = function(error) {
+          console.error('SSE Error:', error);
+        };
+      });
+    }
+
+    // PORT: Render markdown using marked.js (only if the port exists)
+    if (app.ports && app.ports.renderMarkdown) {
+      app.ports.renderMarkdown.subscribe(function(markdown) {
+        try {
+          var html = marked.parse(markdown);
+          app.ports.markdownRendered.send(html);
+        } catch (error) {
+          console.error('Markdown rendering error:', error);
+          app.ports.markdownRendered.send('Error rendering markdown');
+        }
+      });
+    }
+  </script>
 </body>
 </html>
