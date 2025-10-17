@@ -3,9 +3,11 @@ const state = {
   project: null,
   tasks: { tasks: [], format: 'none', tags: [] },
   prds: [],
+  mermaid: [],
   stats: null,
   selectedTask: null,
   selectedPRD: null,
+  selectedMermaid: null,
   currentTag: 'master',
   filters: {
     status: [],
@@ -24,16 +26,18 @@ let originalTasksCache = null;
 // API calls
 async function loadData() {
   try {
-    const [projectRes, tasksRes, prdsRes, statsRes] = await Promise.all([
+    const [projectRes, tasksRes, prdsRes, mermaidRes, statsRes] = await Promise.all([
       fetch('/api/project'),
       fetch('/api/tasks'),
       fetch('/api/prds'),
+      fetch('/api/mermaid'),
       fetch('/api/stats')
     ]);
 
     state.project = await projectRes.json();
     state.tasks = await tasksRes.json();
     state.prds = (await prdsRes.json()).prds || [];
+    state.mermaid = (await mermaidRes.json()).mermaid || [];
     state.stats = await statsRes.json();
     state.currentTag = state.project.currentTag || 'master';
 
@@ -56,16 +60,18 @@ async function loadData() {
 // Reload data without rendering (for hot-reload)
 async function reloadData() {
   try {
-    const [projectRes, tasksRes, prdsRes, statsRes] = await Promise.all([
+    const [projectRes, tasksRes, prdsRes, mermaidRes, statsRes] = await Promise.all([
       fetch('/api/project'),
       fetch('/api/tasks'),
       fetch('/api/prds'),
+      fetch('/api/mermaid'),
       fetch('/api/stats')
     ]);
 
     state.project = await projectRes.json();
     state.tasks = await tasksRes.json();
     state.prds = (await prdsRes.json()).prds || [];
+    state.mermaid = (await mermaidRes.json()).mermaid || [];
     state.stats = await statsRes.json();
     state.currentTag = state.project.currentTag || 'master';
 
@@ -107,6 +113,26 @@ async function loadPRDContent(filename) {
     return await res.json();
   } catch (error) {
     console.error('Error loading PRD:', error);
+    return null;
+  }
+}
+
+async function loadMermaidContent(filepath) {
+  try {
+    console.log('Fetching Mermaid content for:', filepath);
+    const res = await fetch(`/api/mermaid/${filepath}`);
+    console.log('Fetch response status:', res.status);
+    
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`);
+    }
+    
+    const data = await res.json();
+    console.log('Mermaid data received:', data);
+    return data;
+  } catch (error) {
+    console.error('Error loading Mermaid:', error);
+    showReloadNotification('❌ Failed to load diagram: ' + error.message);
     return null;
   }
 }
@@ -216,7 +242,7 @@ function render() {
     <div class="app-body">
       ${renderSidebar()}
       <main class="main-content">
-        ${state.view === 'tasks' ? renderTaskView() : renderPRDView()}
+        ${state.view === 'tasks' ? renderTaskView() : state.view === 'prds' ? renderPRDView() : renderMermaidView()}
       </main>
       ${state.view === 'tasks' && !state.selectedTask ? renderStats() : ''}
     </div>
@@ -297,6 +323,7 @@ function renderHeader() {
       <div class="view-tabs">
         <button class="${state.view === 'tasks' ? 'active' : ''}" data-view="tasks">Tasks</button>
         <button class="${state.view === 'prds' ? 'active' : ''}" data-view="prds">PRDs</button>
+        <button class="${state.view === 'mermaid' ? 'active' : ''}" data-view="mermaid">Mermaid</button>
       </div>
     </header>
   `;
@@ -606,6 +633,43 @@ function renderPRDView() {
   `;
 }
 
+function renderMermaidView() {
+  if (state.mermaid.length === 0) {
+    return `
+      <div class="prd-viewer">
+        <div class="empty-state">
+          <span class="empty-icon">📊</span>
+          <h3>No Mermaid files found</h3>
+          <p>Add .mmd or .mermaid files to your project</p>
+        </div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="prd-viewer">
+      <div class="prd-list">
+        <div class="prd-list-header">
+          <h2>Mermaid Diagrams</h2>
+          <span class="task-count">${state.mermaid.length} diagrams</span>
+        </div>
+        <div class="prd-list-content">
+          ${state.mermaid.map(mmd => `
+            <div class="prd-item ${state.selectedMermaid === mmd.path ? 'selected' : ''}" data-mermaid="${mmd.path}">
+              <span class="prd-icon">📊</span>
+              <div>
+                <div class="prd-name">${mmd.name}</div>
+                <div class="prd-path">${mmd.path}</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      ${state.selectedMermaid ? '<div id="mermaid-content-placeholder"></div>' : ''}
+    </div>
+  `;
+}
+
 function renderStats() {
   if (!state.stats) return '';
 
@@ -661,6 +725,7 @@ function attachEventListeners() {
       state.view = e.target.dataset.view;
       state.selectedTask = null;
       state.selectedPRD = null;
+      state.selectedMermaid = null;
       render();
     });
   });
@@ -841,6 +906,156 @@ function attachEventListeners() {
               </div>
             </div>
           `;
+        }
+      }
+    });
+  });
+
+  // Mermaid selection
+  document.querySelectorAll('[data-mermaid]').forEach(item => {
+    item.addEventListener('click', async () => {
+      const mermaidPath = item.dataset.mermaid;
+      state.selectedMermaid = mermaidPath;
+      render();
+
+      // Load and display Mermaid content
+      const placeholder = document.getElementById('mermaid-content-placeholder');
+      if (placeholder) {
+        placeholder.innerHTML = `
+          <div class="prd-content">
+            <div class="prd-list-header" style="border-bottom: 1px solid #27272a;">
+              <h2>${mermaidPath}</h2>
+              <button class="close-button" onclick="state.selectedMermaid = null; render();">✕</button>
+            </div>
+            <div class="prd-content-body">
+              <div class="loader-container">
+                <div class="loader"></div>
+                <p>Loading diagram...</p>
+              </div>
+            </div>
+          </div>
+        `;
+
+        const data = await loadMermaidContent(mermaidPath);
+        if (data) {
+          // Create a unique ID for this diagram
+          const diagramId = 'mermaid-diagram-' + Date.now();
+          
+          // Get the full file path
+          const fullFilePath = state.project.projectPath + '/' + mermaidPath;
+          
+          placeholder.innerHTML = `
+            <div class="prd-content">
+              <div class="prd-list-header" style="border-bottom: 1px solid #27272a; display: flex; align-items: center; gap: 0.5rem;">
+                <h2 style="flex: 1;">${mermaidPath}</h2>
+                <button class="mermaid-copy-button" title="Copy Mermaid content">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                  Copy
+                </button>
+                <button class="mermaid-cursor-button" title="Open in Cursor">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                    <polyline points="15 3 21 3 21 9"></polyline>
+                    <line x1="10" y1="14" x2="21" y2="3"></line>
+                  </svg>
+                  Cursor
+                </button>
+                <button class="excalidraw-button" title="Edit in Excalidraw">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                  </svg>
+                  Excalidraw
+                </button>
+                <button class="close-button" onclick="state.selectedMermaid = null; render();">✕</button>
+              </div>
+              <div class="prd-content-body">
+                <div class="mermaid-diagram" id="${diagramId}" style="display: flex; justify-content: center; align-items: center; min-height: 400px;"></div>
+              </div>
+            </div>
+          `;
+
+          // Copy button handler
+          const copyBtn = placeholder.querySelector('.mermaid-copy-button');
+          if (copyBtn) {
+            copyBtn.addEventListener('click', async () => {
+              try {
+                await navigator.clipboard.writeText(data.content);
+                showReloadNotification('📋 Mermaid content copied to clipboard!');
+              } catch (err) {
+                console.error('Failed to copy:', err);
+                showReloadNotification('❌ Failed to copy content');
+              }
+            });
+          }
+
+          // Open in Cursor button handler
+          const cursorBtn = placeholder.querySelector('.mermaid-cursor-button');
+          if (cursorBtn) {
+            cursorBtn.addEventListener('click', () => {
+              const cursorUrl = `cursor://file/${fullFilePath}`;
+              const vscodeUrl = `vscode://file/${fullFilePath}`;
+              
+              const link = document.createElement('a');
+              link.href = cursorUrl;
+              link.click();
+              
+              showReloadNotification('🚀 Opening in Cursor...');
+              
+              setTimeout(() => {
+                const vscodeLink = document.createElement('a');
+                vscodeLink.href = vscodeUrl;
+                vscodeLink.click();
+              }, 500);
+            });
+          }
+
+          // Excalidraw button click handler
+          const excalidrawBtn = placeholder.querySelector('.excalidraw-button');
+          if (excalidrawBtn) {
+            excalidrawBtn.addEventListener('click', async () => {
+              try {
+                // Copy Mermaid content to clipboard
+                await navigator.clipboard.writeText(data.content);
+                showReloadNotification('📋 Copied! Opening Excalidraw - paste with Ctrl/Cmd+V');
+                
+                // Open Excalidraw in new tab after a brief delay
+                setTimeout(() => {
+                  window.open('https://excalidraw.com/', '_blank');
+                }, 500);
+              } catch (err) {
+                console.error('Failed to copy:', err);
+                // Still open Excalidraw even if copy fails
+                window.open('https://excalidraw.com/', '_blank');
+                showReloadNotification('⚠️ Opened Excalidraw. Copy the diagram manually.');
+              }
+            });
+          }
+
+          // Render the Mermaid diagram
+          try {
+            const diagramElement = document.getElementById(diagramId);
+            if (window.mermaid && diagramElement) {
+              const { svg } = await window.mermaid.render(diagramId + '-svg', data.content);
+              diagramElement.innerHTML = svg;
+            }
+          } catch (error) {
+            console.error('Error rendering Mermaid diagram:', error);
+            const diagramElement = document.getElementById(diagramId);
+            if (diagramElement) {
+              diagramElement.innerHTML = `
+                <div class="empty-state">
+                  <span class="empty-icon">❌</span>
+                  <h3>Error rendering diagram</h3>
+                  <p>${error.message}</p>
+                  <pre style="text-align: left; max-width: 600px; margin-top: 1rem;">${data.content}</pre>
+                </div>
+              `;
+            }
+          }
         }
       }
     });

@@ -4,7 +4,7 @@
 [![npm version](https://img.shields.io/npm/v/tm-view.svg)](https://www.npmjs.com/package/tm-view)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Browser-based viewer for Task Master AI projects. View tasks, PRDs, and project statistics in a clean, intuitive interface.
+Browser-based viewer for Task Master AI projects. View tasks, PRDs, Mermaid diagrams, and project statistics in a clean, intuitive interface.
 
 **Repository**: [github.com/pyrex41/tm-view](https://github.com/pyrex41/tm-view)
 
@@ -14,8 +14,10 @@ Browser-based viewer for Task Master AI projects. View tasks, PRDs, and project 
 - 🔍 Filter tasks by status, priority, and search
 - 🏷️ Support for tagged task lists (multi-context projects)
 - 📄 View PRD documents directly in the browser
-- 📊 Real-time statistics and project overview
+- 📊 View Mermaid diagrams from anywhere in your repository
+- 📈 Real-time statistics and project overview
 - 🎨 Clean, dark-themed UI optimized for developer workflows
+- 🔄 Hot-reload support for live updates
 
 ## Installation
 
@@ -90,6 +92,18 @@ The viewer reads from your `.taskmaster` directory:
 - **Markdown rendering** for `.md` files with beautiful formatting
 - Plain text display for `.txt` files with syntax preservation
 
+### Mermaid Diagram Viewer
+- **Automatically finds** all `.mmd` and `.mermaid` files throughout your repository
+- Displays full file paths for easy navigation
+- **Live rendering** of Mermaid diagrams with dark theme and optimized readability
+- **Excalidraw integration** - One-click to copy and open diagrams in Excalidraw for editing
+- Simple workflow: Automatically copies Mermaid content and opens Excalidraw in new tab
+- **Quick actions**: Copy Mermaid content, Open file in Cursor editor, Open in Excalidraw
+- Large, readable diagrams with 18px font size and enhanced spacing
+- Supports all Mermaid diagram types (flowcharts, sequence diagrams, class diagrams, etc.)
+- Export to PNG, SVG, or save edited diagrams directly from Excalidraw
+- Error handling with source code display if rendering fails
+
 ### Statistics
 - Total task count
 - Breakdown by status
@@ -136,7 +150,10 @@ The server exposes these endpoints:
 - `GET /api/tasks/:tag` - Tasks for specific tag
 - `GET /api/prds` - List of PRD documents
 - `GET /api/prds/:filename` - Specific PRD content
+- `GET /api/mermaid` - List of all Mermaid files in the repository
+- `GET /api/mermaid/*` - Specific Mermaid file content (supports nested paths)
 - `GET /api/stats` - Project statistics
+- `GET /api/events` - Server-Sent Events for hot-reload
 
 ## License
 

@@ -5,6 +5,41 @@ All notable changes to tm-view will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Mermaid diagram viewer** - New "Mermaid" tab to view diagram files
+- Automatic discovery of all `.mmd` and `.mermaid` files throughout the repository
+- Live rendering of Mermaid diagrams with dark theme optimization
+- **Excalidraw integration** - One-click button to copy Mermaid content and open Excalidraw
+- Simple workflow: Click Excalidraw button → Content copied → Excalidraw opens → Paste to convert
+- **Quick action buttons**: Copy Mermaid content, Open in Cursor, Open in Excalidraw
+- 95vh full-screen Excalidraw modal with dark theme integration
+- Larger, more readable diagram rendering with improved spacing
+- Full file path display for easy navigation to diagram sources
+- Support for all Mermaid diagram types (flowcharts, sequence diagrams, class diagrams, etc.)
+- Error handling with source code display if diagram rendering fails
+- New API endpoints: `GET /api/mermaid` and `GET /api/mermaid/*`
+- Example Mermaid diagram files for demonstration
+
+### Improved
+- Increased Mermaid diagram font size from default to 18px for better readability
+- Enhanced node and actor spacing in flowcharts and sequence diagrams
+- Larger diagram rendering with 800px minimum width
+- Improved text contrast and stroke width for clearer visuals
+
+### Technical
+- Integrated Mermaid.js v10 from CDN with dark theme configuration
+- Integrated React 18 and Excalidraw from CDN for embedded editor
+- Full-screen modal component with backdrop blur and animations
+- Recursive file search function to find Mermaid files across entire project
+- Security validation for file path access (prevents directory traversal)
+- Dynamic SVG rendering with unique IDs per diagram
+- Mermaid.js initialization with custom dark theme variables and spacing configuration
+- Automatic insertion of Mermaid content as text element in Excalidraw canvas
+- Modal supports ESC key, backdrop click, and close button for dismissal
+- React component mounting/unmounting for proper cleanup
+
 ## [1.0.6] - 2025-10-15
 
 ### Added

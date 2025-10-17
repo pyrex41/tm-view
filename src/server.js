@@ -192,6 +192,78 @@ app.get('/api/prds/:filename', (req, res) => {
   }
 });
 
+// Helper: Recursively find Mermaid files
+function findMermaidFiles(dir, baseDir = dir) {
+  let results = [];
+  
+  try {
+    const files = fs.readdirSync(dir);
+    
+    for (const file of files) {
+      const filePath = path.join(dir, file);
+      const stat = fs.statSync(filePath);
+      
+      // Skip node_modules, .git, and other common directories
+      if (stat.isDirectory()) {
+        if (!file.startsWith('.') && file !== 'node_modules' && file !== 'dist' && file !== 'build') {
+          results = results.concat(findMermaidFiles(filePath, baseDir));
+        }
+      } else if (stat.isFile()) {
+        // Check for .mmd or .mermaid extensions
+        if (file.endsWith('.mmd') || file.endsWith('.mermaid')) {
+          const relativePath = path.relative(baseDir, filePath);
+          results.push({
+            name: file,
+            path: relativePath,
+            fullPath: filePath,
+            size: stat.size,
+            modified: stat.mtime
+          });
+        }
+      }
+    }
+  } catch (error) {
+    console.error(`Error reading directory ${dir}:`, error.message);
+  }
+  
+  return results;
+}
+
+// Get all Mermaid files
+app.get('/api/mermaid', (req, res) => {
+  try {
+    const mermaidFiles = findMermaidFiles(PROJECT_DIR);
+    res.json({ mermaid: mermaidFiles });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get specific Mermaid file content
+app.get('/api/mermaid/*', (req, res) => {
+  try {
+    // Get the path after /api/mermaid/
+    const requestedPath = req.params[0];
+    const mermaidPath = path.join(PROJECT_DIR, requestedPath);
+    
+    // Security check: ensure the path is within PROJECT_DIR
+    const resolvedPath = path.resolve(mermaidPath);
+    const resolvedProjectDir = path.resolve(PROJECT_DIR);
+    if (!resolvedPath.startsWith(resolvedProjectDir)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    if (!fs.existsSync(mermaidPath)) {
+      return res.status(404).json({ error: 'Mermaid file not found' });
+    }
+
+    const content = fs.readFileSync(mermaidPath, 'utf8');
+    res.json({ filename: requestedPath, content });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get task statistics
 app.get('/api/stats', (req, res) => {
   try {

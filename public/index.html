@@ -6,6 +6,44 @@
   <title>Task Master Viewer</title>
   <link rel="stylesheet" href="/css/styles.css">
   <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ 
+      startOnLoad: false,
+      theme: 'dark',
+      themeVariables: {
+        darkMode: true,
+        background: '#0a0e1a',
+        primaryColor: '#3b82f6',
+        primaryTextColor: '#e4e4e7',
+        primaryBorderColor: '#27272a',
+        lineColor: '#52525b',
+        secondaryColor: '#18181b',
+        tertiaryColor: '#27272a',
+        fontSize: '18px',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif'
+      },
+      flowchart: {
+        curve: 'basis',
+        padding: 20,
+        nodeSpacing: 75,
+        rankSpacing: 75,
+        diagramPadding: 20
+      },
+      sequence: {
+        diagramMarginX: 50,
+        diagramMarginY: 50,
+        actorMargin: 100,
+        width: 200,
+        height: 80,
+        boxMargin: 20,
+        boxTextMargin: 10,
+        noteMargin: 20,
+        messageMargin: 50
+      }
+    });
+    window.mermaid = mermaid;
+  </script>
 </head>
 <body>
   <div class="app" id="app">

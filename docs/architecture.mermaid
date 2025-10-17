@@ -1,0 +1,35 @@
+graph LR
+    subgraph Frontend
+        A[HTML/CSS/JS]
+        B[Mermaid.js]
+        C[Marked.js]
+    end
+    
+    subgraph Backend
+        D[Express Server]
+        E[File System API]
+        F[SSE Events]
+    end
+    
+    subgraph Data
+        G[.taskmaster/tasks]
+        H[.taskmaster/docs]
+        I[Mermaid Files]
+    end
+    
+    A --> D
+    B --> A
+    C --> A
+    D --> E
+    D --> F
+    E --> G
+    E --> H
+    E --> I
+    F --> A
+    
+    style A fill:#3b82f6,stroke:#60a5fa,color:#fff
+    style D fill:#1e3a8a,stroke:#3b82f6,color:#e4e4e7
+    style G fill:#14532d,stroke:#4ade80,color:#e4e4e7
+    style H fill:#14532d,stroke:#4ade80,color:#e4e4e7
+    style I fill:#14532d,stroke:#4ade80,color:#e4e4e7
+

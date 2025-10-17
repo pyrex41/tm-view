@@ -1,0 +1,24 @@
+sequenceDiagram
+    participant User
+    participant Browser
+    participant Server
+    participant TaskMaster
+
+    User->>Browser: Open tm-view
+    Browser->>Server: GET /api/project
+    Server->>TaskMaster: Read .taskmaster/
+    TaskMaster-->>Server: Project data
+    Server-->>Browser: JSON response
+    
+    Browser->>Server: GET /api/mermaid
+    Server->>TaskMaster: Find all .mmd files
+    TaskMaster-->>Server: File list
+    Server-->>Browser: Mermaid files
+    
+    Browser->>User: Display Mermaid tab
+    User->>Browser: Click diagram
+    Browser->>Server: GET /api/mermaid/:path
+    Server-->>Browser: Diagram content
+    Browser->>Browser: Render with Mermaid.js
+    Browser->>User: Show rendered diagram
+
