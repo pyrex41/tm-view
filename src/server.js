@@ -264,6 +264,81 @@ app.get('/api/mermaid/*', (req, res) => {
   }
 });
 
+// Update task status
+app.put('/api/tasks/:tag/:taskId/status', (req, res) => {
+  try {
+    const { tag, taskId } = req.params;
+    const { status } = req.body;
+
+    if (!status || !['pending', 'done', 'in-progress', 'review', 'deferred', 'cancelled'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status. Must be one of: pending, done, in-progress, review, deferred, cancelled' });
+    }
+
+    const tasksPath = path.join(TASKMASTER_DIR, 'tasks', 'tasks.json');
+
+    if (!fs.existsSync(tasksPath)) {
+      return res.status(404).json({ error: 'Tasks file not found' });
+    }
+
+    const tasksData = JSON.parse(fs.readFileSync(tasksPath, 'utf8'));
+
+    // Handle both formats
+    let tasks;
+    if (tasksData.tasks && Array.isArray(tasksData.tasks)) {
+      // Legacy format - only 'master' tag
+      if (tag !== 'master') {
+        return res.status(404).json({ error: 'Tag not found in legacy format' });
+      }
+      tasks = tasksData.tasks;
+    } else if (tasksData[tag]) {
+      // Tagged format
+      tasks = tasksData[tag].tasks || [];
+    } else {
+      return res.status(404).json({ error: 'Tag not found' });
+    }
+
+    // Find and update the task (handles both tasks and subtasks)
+    function updateTaskInArray(taskArray, targetId) {
+      for (let i = 0; i < taskArray.length; i++) {
+        const task = taskArray[i];
+        if (task.id.toString() === targetId) {
+          task.status = status;
+          return true;
+        }
+        // Check subtasks recursively
+        if (task.subtasks && task.subtasks.length > 0) {
+          if (updateTaskInArray(task.subtasks, targetId)) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    const updated = updateTaskInArray(tasks, taskId);
+
+    if (!updated) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    // Write back to file
+    if (tasksData.tasks && Array.isArray(tasksData.tasks)) {
+      // Legacy format
+      tasksData.tasks = tasks;
+    } else {
+      // Tagged format
+      tasksData[tag].tasks = tasks;
+    }
+
+    fs.writeFileSync(tasksPath, JSON.stringify(tasksData, null, 2), 'utf8');
+
+    res.json({ success: true, message: `Task ${taskId} status updated to ${status}` });
+  } catch (error) {
+    console.error('Error updating task status:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get task statistics
 app.get('/api/stats', (req, res) => {
   try {

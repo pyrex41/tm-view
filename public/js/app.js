@@ -469,6 +469,7 @@ function renderTaskDetail() {
   if (!state.selectedTask) return '';
 
   const task = state.selectedTask;
+  const statusOptions = ['pending', 'in-progress', 'done', 'review', 'deferred', 'cancelled'];
 
   return `
     <div class="task-detail">
@@ -481,7 +482,9 @@ function renderTaskDetail() {
       </div>
       <div class="task-detail-content">
         <div class="task-badges">
-          <span class="badge status-${task.status}">${task.status}</span>
+          <select class="status-dropdown-large badge status-${task.status}" data-task-status="${task.id}" value="${task.status}">
+            ${statusOptions.map(status => `<option value="${status}" ${status === task.status ? 'selected' : ''}>${status}</option>`).join('')}
+          </select>
           ${task.priority ? `<span class="badge priority-${task.priority}">${task.priority}</span>` : ''}
         </div>
 
@@ -521,18 +524,21 @@ function renderTaskDetail() {
           <div class="detail-section">
             <h3>Subtasks (${task.subtasks.length})</h3>
             <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-              ${task.subtasks.map(subtask => {
-                const isExpanded = state.expandedSubtasksInDetail.has(subtask.id.toString());
-                return `
-                  <div class="subtask-card ${isExpanded ? 'expanded' : ''}" data-subtask-id="${subtask.id}" style="background: #27272a; padding: 0.75rem; border-radius: 4px; border-left: 3px solid ${isExpanded ? '#60a5fa' : '#3b82f6'}; cursor: pointer; transition: all 0.2s;">
-                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
-                      <span style="font-family: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', 'Consolas', monospace; color: #3b82f6; font-weight: 600;">${subtask.id}</span>
-                      <span class="badge status-${subtask.status}">${subtask.status}</span>
-                      ${subtask.priority ? `<span class="badge priority-${subtask.priority}">${subtask.priority}</span>` : ''}
-                      <span style="margin-left: auto; color: #71717a; font-size: 0.75rem;">${isExpanded ? '▼' : '▶'}</span>
-                    </div>
-                    <div style="color: #e4e4e7; font-weight: 500;">${subtask.title}</div>
-                    ${!isExpanded && subtask.description ? `<div style="color: #a1a1aa; font-size: 0.875rem; margin-top: 0.25rem;">${subtask.description}</div>` : ''}
+               ${task.subtasks.map(subtask => {
+                 const isExpanded = state.expandedSubtasksInDetail.has(subtask.id.toString());
+                 const statusOptions = ['pending', 'in-progress', 'done', 'review', 'deferred', 'cancelled'];
+                 return `
+                   <div class="subtask-card ${isExpanded ? 'expanded' : ''}" data-subtask-id="${subtask.id}" style="background: #27272a; padding: 0.75rem; border-radius: 4px; border-left: 3px solid ${isExpanded ? '#60a5fa' : '#3b82f6'}; cursor: pointer; transition: all 0.2s;">
+                     <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                       <span style="font-family: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', 'Consolas', monospace; color: #3b82f6; font-weight: 600;">${subtask.id}</span>
+                       <select class="status-dropdown-small badge status-${subtask.status}" data-task-status="${subtask.id}" value="${subtask.status}">
+                         ${statusOptions.map(status => `<option value="${status}" ${status === subtask.status ? 'selected' : ''}>${status}</option>`).join('')}
+                       </select>
+                       ${subtask.priority ? `<span class="badge priority-${subtask.priority}">${subtask.priority}</span>` : ''}
+                       <span style="margin-left: auto; color: #71717a; font-size: 0.75rem;">${isExpanded ? '▼' : '▶'}</span>
+                     </div>
+                     <div style="color: #e4e4e7; font-weight: 500;">${subtask.title}</div>
+                     ${!isExpanded && subtask.description ? `<div style="color: #a1a1aa; font-size: 0.875rem; margin-top: 0.25rem;">${subtask.description}</div>` : ''}
 
                     ${isExpanded ? `
                       <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #3f3f46;">
@@ -572,15 +578,20 @@ function renderTaskDetail() {
                           <div>
                             <div style="color: #a1a1aa; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; margin-bottom: 0.5rem;">Subtasks (${subtask.subtasks.length})</div>
                             <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-                              ${subtask.subtasks.map(subsubtask => `
-                                <div style="background: #18181b; padding: 0.5rem; border-radius: 3px; border-left: 2px solid #3b82f6;">
-                                  <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                    <span style="font-family: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', 'Consolas', monospace; color: #3b82f6; font-size: 0.75rem; font-weight: 600;">${subsubtask.id}</span>
-                                    <span class="badge status-${subsubtask.status}" style="font-size: 0.65rem; padding: 0.125rem 0.375rem;">${subsubtask.status}</span>
-                                  </div>
-                                  <div style="color: #e4e4e7; font-size: 0.875rem; margin-top: 0.25rem;">${subsubtask.title}</div>
-                                </div>
-                              `).join('')}
+                               ${subtask.subtasks.map(subsubtask => {
+                                 const statusOptions = ['pending', 'in-progress', 'done', 'review', 'deferred', 'cancelled'];
+                                 return `
+                                   <div style="background: #18181b; padding: 0.5rem; border-radius: 3px; border-left: 2px solid #3b82f6;">
+                                     <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                       <span style="font-family: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', 'Consolas', monospace; color: #3b82f6; font-size: 0.75rem; font-weight: 600;">${subsubtask.id}</span>
+                                       <select class="status-dropdown-tiny badge status-${subsubtask.status}" data-task-status="${subsubtask.id}" value="${subsubtask.status}" style="font-size: 0.65rem; padding: 0.125rem 0.375rem;">
+                                         ${statusOptions.map(status => `<option value="${status}" ${status === subsubtask.status ? 'selected' : ''}>${status}</option>`).join('')}
+                                       </select>
+                                     </div>
+                                     <div style="color: #e4e4e7; font-size: 0.875rem; margin-top: 0.25rem;">${subsubtask.title}</div>
+                                   </div>
+                                 `;
+                               }).join('')}
                             </div>
                           </div>
                         ` : ''}
@@ -833,6 +844,11 @@ function attachEventListeners() {
 
   subtaskCards.forEach(item => {
     item.addEventListener('click', (e) => {
+      // Don't toggle expansion if clicking on a dropdown
+      if (e.target.tagName === 'SELECT' || e.target.closest('select')) {
+        return;
+      }
+
       e.stopPropagation(); // Prevent event bubbling
       const subtaskId = item.dataset.subtaskId;
 
@@ -844,6 +860,83 @@ function attachEventListeners() {
       }
 
       render();
+    });
+  });
+
+  // Status dropdown changes
+  document.querySelectorAll('[data-task-status]').forEach(dropdown => {
+    dropdown.addEventListener('change', async (e) => {
+      e.stopPropagation(); // Prevent event bubbling
+
+      const taskId = e.target.dataset.taskStatus;
+      const newStatus = e.target.value;
+      const originalStatus = e.target.getAttribute('value');
+
+      // Store the original value for potential rollback
+      e.target.setAttribute('value', newStatus);
+
+      try {
+        const response = await fetch(`/api/tasks/${state.currentTag}/${taskId}/status`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ status: newStatus }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        showReloadNotification(`✅ ${result.message}`);
+
+        // Update the local state to reflect the change immediately
+        function updateTaskStatus(taskArray, targetId, newStatus) {
+          for (let task of taskArray) {
+            if (task.id.toString() === targetId) {
+              task.status = newStatus;
+              return true;
+            }
+            if (task.subtasks && task.subtasks.length > 0) {
+              if (updateTaskStatus(task.subtasks, targetId, newStatus)) {
+                return true;
+              }
+            }
+          }
+          return false;
+        }
+
+        // Update in the original cache
+        if (originalTasksCache) {
+          updateTaskStatus(originalTasksCache, taskId, newStatus);
+        }
+
+        // Update selected task if it's the one being changed
+        if (state.selectedTask && state.selectedTask.id.toString() === taskId) {
+          state.selectedTask.status = newStatus;
+        }
+
+        // Update the dropdown's class to reflect the new status
+        e.target.className = `status-dropdown-large badge status-${newStatus}`;
+
+        // Re-render to update UI (but preserve the dropdown state)
+        render();
+
+      } catch (error) {
+        console.error('Error updating task status:', error);
+        showReloadNotification(`❌ Failed to update status: ${error.message}`);
+
+        // Revert the dropdown to the original value and class
+        e.target.value = originalStatus;
+        e.target.setAttribute('value', originalStatus);
+        e.target.className = `status-dropdown-large badge status-${originalStatus}`;
+      }
+    });
+
+    // Prevent clicks on dropdown from triggering parent click handlers
+    dropdown.addEventListener('click', (e) => {
+      e.stopPropagation();
     });
   });
 
