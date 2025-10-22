@@ -5,6 +5,22 @@ All notable changes to tm-view will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.8] - 2025-01-22
+
+### Added
+- **Task Status Editing** - Direct status updates for tasks and subtasks
+- Status dropdowns in task detail view with all valid statuses (pending, in-progress, done, review, deferred, cancelled)
+- Backend API endpoint `PUT /api/tasks/:tag/:taskId/status` for status updates
+- Proper tag context handling - updates tasks within the correct tag namespace
+- Recursive status updates for subtasks at any depth level
+- Real-time UI updates with success/error notifications
+- Status dropdown styling with different sizes for main tasks, subtasks, and sub-subtasks
+- Event handling fixes to prevent dropdown flashing and interference with task expansion
+
+### Fixed
+- Dropdown flashing issue when clicking status selectors
+- Event propagation conflicts between dropdowns and subtask expansion
+
 ## [Unreleased]
 
 ### Added
