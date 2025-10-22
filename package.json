@@ -1,6 +1,6 @@
 {
   "name": "tm-view",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Browser-based viewer for Task Master AI projects",
   "main": "src/server.js",
   "type": "module",
